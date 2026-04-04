@@ -56,7 +56,13 @@ def build_final_summary(
     zero_df: pd.DataFrame,
     vendor_inv_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    logger.info('Building corrected vendor summary...')
+    """
+    Join purchase aggregates, sales aggregates, price reference, freight,
+    and inventory data into the final vendor-brand summary. Appends
+    sales-only rows that have no 2024 purchase record. Allocates vendor-level
+    freight to individual vendor-brand rows in proportion to purchase dollars.
+    """
+    logger.info('Building vendor summary...')
     summary = purchases.merge(vendor_map, on='VendorNumber', how='left').rename(columns={'CanonicalVendorName': 'VendorName'})
     summary = summary.merge(pp[['Brand', 'Description', 'ActualPrice', 'Volume']].rename(columns={'Description': 'PPDescription'}), on='Brand', how='left')
     summary['Description'] = summary['Description'].fillna(summary['PPDescription'])

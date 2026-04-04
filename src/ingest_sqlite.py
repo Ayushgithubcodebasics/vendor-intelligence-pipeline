@@ -25,10 +25,10 @@ def main() -> None:
     engine = create_engine(DB_URL, echo=False)
     for csv_path in sorted(RAW_DATA_DIR.glob('*.csv')):
         ingest_csv_to_sqlite(csv_path, csv_path.stem, engine)
-    corrected = OUTPUT_DIR / 'vendor_sales_summary_corrected.csv'
-    if corrected.exists():
-        pd.read_csv(corrected).to_sql('vendor_sales_summary_corrected', con=engine, if_exists='replace', index=False)
-        logger.info('Loaded corrected summary into SQLite')
+    summary = OUTPUT_DIR / 'vendor_summary.csv'
+    if summary.exists():
+        pd.read_csv(summary).to_sql('vendor_summary', con=engine, if_exists='replace', index=False)
+        logger.info('Loaded vendor summary into SQLite')
 
 
 if __name__ == '__main__':

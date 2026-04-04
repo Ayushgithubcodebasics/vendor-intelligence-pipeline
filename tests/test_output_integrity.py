@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-OUTPUT = ROOT / 'outputs' / 'vendor_sales_summary_corrected.csv'
+OUTPUT = ROOT / 'outputs' / 'vendor_summary.csv'
 SAMPLE = ROOT / 'data' / 'sample'
 METRICS_PATH = ROOT / 'outputs' / 'validation_metrics.json'
 REPORT_PATH = ROOT / 'outputs' / 'validation_report.txt'
@@ -20,7 +20,7 @@ OTIF_PATH = ROOT / 'outputs' / 'vendor_otif.csv'
 @pytest.fixture(scope='session')
 def output_df():
     if not OUTPUT.exists():
-        pytest.skip('vendor_sales_summary_corrected.csv not found. Run `python -m src.rebuild_pipeline` first.')
+        pytest.skip('vendor_summary.csv not found. Run `python -m src.rebuild_pipeline` first.')
     return pd.read_csv(OUTPUT, low_memory=False)
 
 
@@ -40,7 +40,7 @@ def sample_purchases():
 
 
 def test_output_exists():
-    assert OUTPUT.exists(), 'vendor_sales_summary_corrected.csv is missing from outputs/.'
+    assert OUTPUT.exists(), 'vendor_summary.csv is missing from outputs/.'
 
 
 def test_vendor_brand_unique(output_df):

@@ -62,7 +62,7 @@
 | Freight | DECIMAL | Freight or shipping cost billed on the invoice. | Nulls coerced to 0 |
 | Approval | TEXT | Approval status field; mostly blank in the source data. | Mostly null — not used for KPI logic |
 
-## Generated output: vendor_sales_summary_corrected.csv
+## Generated output: vendor_summary.csv
 
 | Column | Type | Description / Formula |
 |---|---|---|
