@@ -1,0 +1,39 @@
+VERIFICATION SUMMARY
+====================
+
+This package was upgraded against the forensic audit, forensic review, and upgrade reports, then revalidated.
+
+What was re-run and checked
+---------------------------
+1. Raw-data rebuild steps were executed against the delivered CSV package under data/raw/:
+   - vendor_map
+   - purchase_prices
+   - purchases
+   - sales
+   - freight
+   - finalize (outputs regenerated and validation artifacts refreshed)
+2. Outputs regenerated in this package:
+   - outputs/vendor_sales_summary_corrected.csv
+   - outputs/vendor_lead_time.csv
+   - outputs/vendor_otif.csv
+   - outputs/vendor_sales_monthly.csv
+   - outputs/validation_metrics.json
+   - outputs/validation_report.txt
+3. Pytest suite result after the final code/doc fixes:
+   - 16 passed
+   - 1 warning (expected): all OTIF tiers collapse to TIER_1_RELIABLE on this dataset
+
+Verified upgrade points
+-----------------------
+- StockTurnover is a real inventory-based KPI and is not documented as a sell-through alias anymore.
+- FreightCost is now allocated to vendor-brand rows by purchase-dollar share, making the column additive in Power BI.
+- validation_metrics.json includes freight reconciliation and outlier counts.
+- vendor_sales_monthly.csv exists and contains 12 distinct YearMonth values.
+- Duplicate (VendorNumber, Brand) rows in final output: 0.
+- Purchase, sales, and freight totals all reconcile to the delivered raw data.
+- OTIF SLA is declared in src/config.py as OTIF_SLA_DAYS = 14.
+
+Packaging note
+--------------
+The clean shareable zip excludes data/raw/, caches, logs, and intermediate rebuild files.
+Use the separate raw data package if you want to rerun the full rebuild locally.

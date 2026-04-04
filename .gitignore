@@ -1,0 +1,37 @@
+# Python bytecode — never commit compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database — too large and regenerable
+*.db
+*.sqlite
+
+# Logs — runtime artifacts
+logs/
+
+# Virtual environment
+.venv/
+venv/
+.env
+
+# Raw full data — too large for Git (use data/sample/ instead)
+data/raw/
+
+# Regenerable outputs — can be rebuilt by running the pipeline
+outputs/vendor_sales_summary_corrected.csv
+outputs/vendor_lead_time.csv
+outputs/vendor_otif.csv
+outputs/vendor_sales_monthly.csv
+outputs/validation_metrics.json
+outputs/validation_report.txt
+outputs/_intermediate/
+
+# macOS / Windows junk
+.DS_Store
+__MACOSX/
+Thumbs.db
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
