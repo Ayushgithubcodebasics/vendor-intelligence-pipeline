@@ -15,6 +15,12 @@ def _strip(series: pd.Series) -> pd.Series:
 
 
 def build_vendor_name_map() -> tuple[pd.DataFrame, int]:
+    """
+    Build a canonical vendor name by finding the most-frequently-seen name
+    variant for each VendorNumber across purchases, sales, and invoice files.
+    Tie-breaks go to the alphabetically earlier name. Returns the map and
+    a count of how many vendors had more than one name variant.
+    """
     logger.info('Building canonical vendor name map...')
     counter: dict[tuple[int, str], int] = defaultdict(int)
     sources = [
@@ -67,6 +73,13 @@ def load_purchase_prices() -> tuple[pd.DataFrame, int, bool]:
 
 
 def aggregate_purchases() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
+    """
+    Aggregate purchases.csv in chunks, computing a true weighted average
+    purchase price per vendor-brand (not a chunk-level mean). Rows where
+    PurchasePrice = 0 are excluded from aggregation and counted separately.
+    Returns: aggregated purchases, zero-price row counts, PO-level date map,
+    and total zero-price row count.
+    """
     logger.info('Aggregating purchases.csv...')
     purchase_map: dict[tuple[int, int], dict[str, float | str]] = {}
     zero_map: dict[tuple[int, int], int] = defaultdict(int)
