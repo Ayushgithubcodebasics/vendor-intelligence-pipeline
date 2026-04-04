@@ -1,3 +1,8 @@
+This statement was written as part of the project because EU data protection law was
+covered in my second year at Riga Nordic University, and I wanted to apply that correctly
+here. The dataset does not contain personal data under GDPR, but I documented the analysis
+so future readers understand why the raw data was kept local rather than published.
+
 # GDPR Compliance Statement
 
 ## Data classification
