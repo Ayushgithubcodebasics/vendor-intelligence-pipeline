@@ -15,17 +15,37 @@
 
 ---
 
+## Why I built this
+
+I found this dataset on Kaggle — it covers a beverage alcohol distributor's full 2024
+purchase, sales, and inventory records. I picked it because it had real problems in it:
+the same vendor appearing under different legal entity names across three source files,
+purchase orders with negative lead times (receiving date before the PO date), and product
+descriptions that don't match cleanly across tables.
+
+The ExciseTax field in the sales data made the industry obvious from the start. Alcohol
+excise is collected from the distributor and passed through, so it doesn't affect gross
+profit but it does inflate the headline sales price for non-analyst readers. I kept that
+in mind when interpreting the margin numbers.
+
+The hardest part technically was the weighted average purchase price across 2.3 million
+rows read in 300,000-row chunks. A simple chunk-level mean gives the wrong answer when
+chunk sizes are uneven — I had to track running totals of dollars and quantity separately
+and compute the true weighted average only at the end. That took a while to get right.
+
+---
+
 ## Business problem
 
-A retail distribution company managing inventory across roughly 80 stores and 129 vendors
-needed to answer three operational questions:
+A beverage alcohol distributor managing inventory across roughly 80 store locations and
+129 vendors needed to answer three operational questions:
 
 1. Which vendors generate the highest gross profit relative to procurement cost?
 2. Which vendors are operationally reliable versus risky on delivery timeliness?
 3. Which products tie up working capital through low sell-through and high unsold inventory value?
 
-Without a consolidated analytical layer, answering these questions required manual work across
-six disconnected CSV files and produced no reliable vendor-level KPI view.
+Without a consolidated analytical layer, answering these questions required manual work
+across six disconnected CSV files and produced no reliable vendor-level KPI view.
 
 ---
 
@@ -81,7 +101,10 @@ synthetic or unusually clean compared with real procurement operations.
 | Vendor Reliability Tier | `TIER_1 (≥95%), TIER_2 (≥80%), TIER_3 (<80%)` | Computed from OTIF |
 | Freight Cost | Vendor freight allocated to vendor-brand rows by purchase-dollar share | vendor_invoice, purchases |
 
-**Note:** `SellThroughRate` is the quantity-based operational ratio. `StockTurnover` is now computed from allocated average inventory value by vendor-brand, so the two metrics should not be interpreted as equivalents. `FreightCost` is also safe to sum in downstream BI tools because vendor freight is allocated across vendor-brand rows by purchase-dollar share during the rebuild.
+**Note:** `SellThroughRate` is the quantity-based operational ratio. `StockTurnover` is computed from
+allocated average inventory value by vendor-brand, so the two metrics are not interchangeable.
+`FreightCost` is safe to sum in downstream BI tools because vendor freight is allocated across
+vendor-brand rows by purchase-dollar share during the rebuild.
 
 ---
 
@@ -89,8 +112,8 @@ synthetic or unusually clean compared with real procurement operations.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Ayushgithubcodebasics/vendor-performance.git
-cd vendor-performance
+git clone https://github.com/Ayushgithubcodebasics/vendor-intelligence-pipeline.git
+cd vendor-intelligence-pipeline
 
 # 2. Create virtual environment and install dependencies
 python -m venv .venv
@@ -106,7 +129,7 @@ python -m src.rebuild_pipeline
 # 5. Validate outputs
 pytest tests/ -v
 
-# 6. Optionally load raw tables and corrected output into SQLite
+# 6. Optionally load raw tables and vendor summary into SQLite
 python -m src.ingest_sqlite
 ```
 
@@ -136,18 +159,23 @@ python -m src.ingest_sqlite
    final output with `CostBasisAvailable = 0` and `RowType = sales_only_no_2024_purchase` instead of being
    silently dropped.
 
+6. **Sell-through outliers are real and materially distort averages.** The output contains **1,168 rows**
+   with `SellThroughRate > 2.0`, and the maximum observed value is **274.5x**. Any Power BI average or
+   scatter chart using sell-through should cap or filter these rows before interpretation.
 
-6. **Sell-through outliers are real and materially distort averages.** The output contains **1,168 rows** with `SellThroughRate > 2.0`, and the maximum observed value is **274.5x**. Any Power BI average or scatter chart using sell-through should cap or filter these rows before interpretation.
-
-7. **Profit-margin outliers are extreme because cost basis is period-aggregated.** The output contains **698 rows** with `|ProfitMargin| > 100%`, and the minimum observed margin is **-23,730.64%**. These are not formula bugs; they are a consequence of comparing 2024 sales against 2024 purchases when prior-period inventory is still being sold.
+7. **Profit-margin outliers are extreme because cost basis is period-aggregated.** The output contains
+   **698 rows** with `|ProfitMargin| > 100%`, and the minimum observed margin is **-23,730.64%**. These
+   are not formula bugs; they are a consequence of comparing 2024 sales against 2024 purchases when
+   prior-period inventory is still being sold.
 
 ---
 
 ## Project structure
 
 ```text
-vendor-performance/
+vendor-intelligence-pipeline/
 ├── README.md
+├── PROJECT_NOTES.txt
 ├── requirements.txt
 ├── .gitignore
 ├── data/
@@ -155,6 +183,7 @@ vendor-performance/
 │   └── sample/                   # 5,000-row quickstart samples
 ├── docs/
 │   ├── data_dictionary.md
+│   ├── dashboard_setup.md
 │   └── GDPR_statement.md
 ├── src/
 │   ├── __init__.py
@@ -169,10 +198,23 @@ vendor-performance/
 ├── tests/
 │   └── test_output_integrity.py
 └── outputs/
-    ├── vendor_sales_summary_corrected.csv
+    ├── vendor_summary.csv
     ├── vendor_lead_time.csv
     ├── vendor_otif.csv
     ├── vendor_sales_monthly.csv
     ├── validation_metrics.json
     └── validation_report.txt
 ```
+
+---
+
+## What I'd improve next
+
+- **CI/CD:** add a GitHub Actions workflow to run `pytest` on the sample data on every push
+- **Cross-platform run script:** the current `run_rebuild_steps.ps1` is Windows-only; a `Makefile`
+  with `make run` and `make test` targets would cover Mac and Linux users
+- **Weighted average unit test:** a small fixed fixture (five rows, known correct answer) to
+  specifically validate the chunk-aggregation logic in `aggregate_purchases()`
+- **OTIF threshold sensitivity:** explore whether a tighter SLA window (7 days instead of 14)
+  produces any tier separation, or whether the clean lead times in this dataset make differentiation
+  impossible regardless of the threshold chosen
