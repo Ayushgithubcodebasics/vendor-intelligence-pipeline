@@ -1,6 +1,6 @@
 # Vendor Profitability and Supply Chain Performance Analysis
 
-**Stack:** Python 3.11+ · pandas · SQLite · pytest · Power BI  
+**Stack:** Python 3.11+ · pandas · SQLite · SQL · pytest · Power BI  
 **Data scale:** 15.65 million transaction and inventory rows · 6 source tables · 129 vendors · 2024 fiscal year
 
 [![Power BI Dashboard](https://img.shields.io/badge/Power%20BI-Live%20Dashboard-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)](https://app.powerbi.com/view?r=eyJrIjoiZDYwNTZmZTItYjFlMi00ZWIxLTlkYWUtMDRiZmE3MjZjOWEzIiwidCI6ImM2ZTU0OWIzLTVmNDUtNDAzMi1hYWU5LWQ0MjQ0ZGM1YjJjNCJ9)
@@ -107,11 +107,12 @@ The hardest part technically was the weighted average purchase price across 2.3 
 purchases.csv       ──┐
 sales.csv            ─┤
 purchase_prices.csv  ─┼──► src/rebuild_pipeline.py ──► outputs/
-vendor_invoice.csv   ─┤         │
-begin_inventory.csv  ─┤    Canonical vendor map
-end_inventory.csv    ─┘    Lead time + OTIF KPIs
-                           Dollar reconciliation (penny-exact)
-                           17-test validation suite
+vendor_invoice.csv   ─┤         │                            │
+begin_inventory.csv  ─┤    Canonical vendor map              │
+end_inventory.csv    ─┘    Lead time + OTIF KPIs             │
+                           Dollar reconciliation              ▼
+                           17-test validation suite    sql/ queries
+                                                      (SQLite layer)
 ```
 
 **Key decisions:**
@@ -119,6 +120,29 @@ end_inventory.csv    ─┘    Lead time + OTIF KPIs
 - Modal-variant vendor name canonicalization across three source files
 - Freight allocated to vendor-brand rows by purchase-dollar share — additive in Power BI
 - 758 sales-only rows retained with `CostBasisAvailable = 0` rather than silently dropped
+- SQL analysis layer in `sql/` validates pipeline outputs directly against SQLite using window functions, CTEs, and `LAG()` — independent cross-check of all five findings
+
+---
+
+## SQL Analysis Layer
+
+The `sql/` folder contains four query files that run against the raw tables in SQLite (populated via `python -m src.ingest_sqlite`). They answer the same business questions as `docs/findings.md` using SQL independently of the Python pipeline — a cross-validation layer and a demonstration of analytical SQL skills.
+
+| File | Business question | Key SQL techniques |
+|---|---|---|
+| `01_vendor_concentration.sql` | Spend ranking, cumulative %, ABC tier classification | CTE, `SUM OVER`, `RANK`, `ROW_NUMBER` |
+| `02_margin_and_profitability.sql` | GP ranking, negative-margin SKUs, margin quartile distribution | CTE, `NTILE`, `RANK`, `CASE WHEN` |
+| `03_inventory_and_working_capital.sql` | Unsold exposure by vendor, high-risk SKUs, low sell-through vendors | CTE, `SUM OVER`, `RANK`, ratio analysis |
+| `04_lead_time_and_delivery.sql` | OTIF calculation, lead time variance ranking, MoM purchase trend | CTE, `LAG`, `JULIANDAY`, population variance |
+
+To run:
+
+```bash
+python -m src.ingest_sqlite           # populate inventory.db
+sqlite3 inventory.db < sql/01_vendor_concentration.sql
+```
+
+See [`sql/README.md`](sql/README.md) for setup details and cross-reference to pipeline findings.
 
 ---
 
@@ -162,6 +186,10 @@ python -m src.rebuild_pipeline --source sample
 
 # Validate
 pytest tests/ -v
+
+# Load into SQLite and run SQL analysis queries
+python -m src.ingest_sqlite
+sqlite3 inventory.db < sql/01_vendor_concentration.sql
 ```
 
 **Full data:** 8–15 minutes. **Sample data:** under 30 seconds.  
@@ -200,6 +228,12 @@ vendor-intelligence-pipeline/
 │   ├── findings.md              ← full findings with recommendation tables
 │   ├── data_dictionary.md       ← field-level reference for all 6 source tables
 │   └── dashboard_setup.md      ← Power BI connection and DAX measure notes
+├── sql/
+│   ├── README.md                    ← setup and cross-reference to findings
+│   ├── 01_vendor_concentration.sql  ← spend ranking, cumulative %, ABC classification
+│   ├── 02_margin_and_profitability.sql ← GP ranking, negative-margin SKUs, quartiles
+│   ├── 03_inventory_and_working_capital.sql ← unsold exposure, sell-through risk
+│   └── 04_lead_time_and_delivery.sql ← OTIF, lead time variance, MoM trend with LAG()
 ├── src/
 │   ├── config.py
 │   ├── ingestion.py
