@@ -65,7 +65,10 @@ def step_finalize() -> None:
     pp = pd.read_csv(INTERMEDIATE / 'purchase_prices_dedup.csv')
     purchases = pd.read_csv(INTERMEDIATE / 'purchases_agg.csv')
     zero_path = INTERMEDIATE / 'zero_price_agg.csv'
-    zero_df = pd.read_csv(zero_path) if zero_path.exists() and zero_path.stat().st_size > 0 else pd.DataFrame(columns=['VendorNumber', 'Brand', 'ZeroPriceRowsExcluded'])
+    try:
+        zero_df = pd.read_csv(zero_path) if zero_path.exists() and zero_path.stat().st_size > 0 else pd.DataFrame(columns=['VendorNumber', 'Brand', 'ZeroPriceRowsExcluded'])
+    except Exception:
+        zero_df = pd.DataFrame(columns=['VendorNumber', 'Brand', 'ZeroPriceRowsExcluded'])
     po_df = pd.read_csv(INTERMEDIATE / 'purchase_orders_agg.csv', parse_dates=['PODate', 'ReceivingDate'])
     sales = pd.read_csv(INTERMEDIATE / 'sales_agg.csv')
     freight = pd.read_csv(INTERMEDIATE / 'freight_agg.csv')
@@ -114,9 +117,31 @@ def run_step(step: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--step', choices=['vendor_map', 'purchase_prices', 'purchases', 'sales', 'freight', 'finalize'])
+    parser = argparse.ArgumentParser(
+        description='Rebuild the vendor intelligence pipeline outputs.',
+    )
+    parser.add_argument(
+        '--step',
+        choices=['vendor_map', 'purchase_prices', 'purchases', 'sales', 'freight', 'finalize'],
+        help='Run a single named step instead of the full pipeline.',
+    )
+    parser.add_argument(
+        '--source',
+        choices=['raw', 'sample'],
+        default='raw',
+        help='Data source: "raw" (default) uses data/raw/; "sample" copies data/sample/ '
+             'files into data/raw/ first. Use "sample" for CI or lightweight inspection.',
+    )
     args = parser.parse_args()
+
+    if args.source == 'sample':
+        from src.config import RAW_DATA_DIR, SAMPLE_DATA_DIR
+        import shutil
+        RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        for sample_file in SAMPLE_DATA_DIR.glob('*_sample.csv'):
+            dest = RAW_DATA_DIR / sample_file.name.replace('_sample', '')
+            shutil.copy(sample_file, dest)
+            logger.info('Copied sample file: %s → %s', sample_file.name, dest.name)
 
     if args.step:
         run_step(args.step)

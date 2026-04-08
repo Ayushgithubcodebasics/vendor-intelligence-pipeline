@@ -7,8 +7,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: pytest tests/ -v
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate outputs from sample data
+        # Runs the full pipeline on the 5,000-row quickstart samples.
+        # Raw data (~1.9 GB) is not committed to the repository; sample data
+        # is committed in data/sample/ and is sufficient to exercise every
+        # pipeline step and produce all output files needed by the test suite.
+        run: python -m src.rebuild_pipeline --source sample
+
+      - name: Run test suite
+        run: pytest tests/ -v

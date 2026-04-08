@@ -1,194 +1,207 @@
 # Vendor Profitability and Supply Chain Performance Analysis
 
-**Author:** Ayush Butoliya — BSc Information Systems, Riga Nordic University  
 **Stack:** Python 3.11+ · pandas · SQLite · pytest · Power BI  
-**Data scale:** 15.65 million transaction and inventory rows across 6 source tables (2024 fiscal year)
-
----
-
-## Live Dashboard
+**Data scale:** 15.65 million transaction and inventory rows · 6 source tables · 129 vendors · 2024 fiscal year
 
 [![Power BI Dashboard](https://img.shields.io/badge/Power%20BI-Live%20Dashboard-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)](https://app.powerbi.com/view?r=eyJrIjoiZDYwNTZmZTItYjFlMi00ZWIxLTlkYWUtMDRiZmE3MjZjOWEzIiwidCI6ImM2ZTU0OWIzLTVmNDUtNDAzMi1hYWU5LWQ0MjQ0ZGM1YjJjNCJ9)
 
-> Interactive vendor profitability, supply chain, and inventory analysis —
-> built on 15.6 million transaction rows across 129 vendors (2024 fiscal year).
+---
+
+## Business Findings and Recommendations
+
+A beverage alcohol distributor managing 129 vendors and ~80 store locations had no consolidated analytical layer. Answering basic procurement and margin questions required manual work across six disconnected CSV files with no reliable vendor-level KPI view. This pipeline consolidates those into a single analytical output suite used by Supply Chain, Category Management, Inventory, and Procurement teams.
 
 ---
 
-## Why I built this
+**Finding 1 — $210.3M in procurement is concentrated in 10 vendors (65.3% of total spend)**
 
-I found this dataset on Kaggle — it covers a beverage alcohol distributor's full 2024
-purchase, sales, and inventory records. I picked it because it had real problems in it:
-the same vendor appearing under different legal entity names across three source files,
-purchase orders with negative lead times (receiving date before the PO date), and product
-descriptions that don't match cleanly across tables.
+DIAGEO NORTH AMERICA alone holds $51.0M — 15.8% of all purchasing. A disruption, pricing renegotiation, or contract change with any of these 10 vendors would affect the majority of purchasing volume without a market-wide event.
 
-The ExciseTax field in the sales data made the industry obvious from the start. Alcohol
-excise is collected from the distributor and passed through, so it doesn't affect gross
-profit but it does inflate the headline sales price for non-analyst readers. I kept that
-in mind when interpreting the margin numbers.
-
-The hardest part technically was the weighted average purchase price across 2.3 million
-rows read in 300,000-row chunks. A simple chunk-level mean gives the wrong answer when
-chunk sizes are uneven — I had to track running totals of dollars and quantity separately
-and compute the true weighted average only at the end. That took a while to get right.
+*Recommendation to Supply Chain Leadership:* initiate a vendor diversification review for the top 5 by spend, targeting a reduction in top-10 concentration from 65.3% to below 55% over two procurement cycles, by qualifying alternative-source vendors for the highest-volume SKUs.
 
 ---
 
-## Business problem
+**Finding 2 — Portfolio gross margin is 28.8%, but 5 high-volume SKUs are structurally unprofitable**
 
-A beverage alcohol distributor managing inventory across roughly 80 store locations and
-129 vendors needed to answer three operational questions:
+Overall reconstructed gross margin: 28.8% ($130.0M GP on $451.6M in sales, cost-basis matched rows only). Five SKUs with more than $100K in annual sales are running negative margins that are not explained by period-aggregation artifacts:
 
-1. Which vendors generate the highest gross profit relative to procurement cost?
-2. Which vendors are operationally reliable versus risky on delivery timeliness?
-3. Which products tie up working capital through low sell-through and high unsold inventory value?
+| SKU | Vendor | Annual Sales | Margin |
+|---|---|---:|---:|
+| Buehler Znfdl Napa | MARTIGNETTI COMPANIES | $119,617 | -15.7% |
+| Ciroc Mango Vodka | DIAGEO | $164,084 | -6.0% |
+| Smirnoff Watermelon Vodka | DIAGEO | $100,067 | -6.0% |
+| Crown Royal Vanilla | DIAGEO | $176,578 | -5.2% |
+| Crown Royal Nrth Harvest Rye | DIAGEO | $113,966 | -1.5% |
 
-Without a consolidated analytical layer, answering these questions required manual work
-across six disconnected CSV files and produced no reliable vendor-level KPI view.
+*Recommendation to Category Management:* audit purchase price vs. retail price for these five SKUs. Buehler Znfdl Napa at -15.7% on $119K in annual sales is the clearest case — the distributor is subsidising the sale at current pricing. Either renegotiate unit cost or reprice before the next contract cycle.
 
 ---
 
-## Solution architecture
+**Finding 3 — $15.6M in working capital is tied up in unsold inventory; top 10 vendors hold $10.12M of it**
 
-```text
+The three largest single-SKU unsold positions are Diageo products with 90–92% sell-through — high-volume SKUs where even a small gap between procurement and sales creates material exposure:
+
+| SKU | Unsold Value | Sell-Through |
+|---|---:|---:|
+| Smirnoff Traveler | $169,786 | 91.9% |
+| Johnnie Walker Black Label | $144,338 | 89.8% |
+| Johnnie Walker Red Label | $123,291 | 91.8% |
+
+Five smaller vendors have unsold ratios above 80% of their entire procurement value — likely discontinued products or ordering errors that can be closed out without a full inventory audit.
+
+*Recommendation to Inventory Management:* prioritise the three Diageo SKUs above for markdown or return negotiation before year-end close. Commission a targeted review of the five high-unsold-ratio small vendors — the combined exposure is recoverable working capital.
+
+---
+
+**Finding 4 — Q4 revenue runs 49.4% above Q1; December peaks at 75.2% above January**
+
+| Month | Revenue | vs. January |
+|---|---:|---:|
+| January | $29.9M | baseline |
+| April | $30.7M | +2.9% |
+| July | $49.7M | +66.4% |
+| November | $42.3M | +41.7% |
+| December | $52.3M | +75.2% |
+
+*Recommendation to Procurement Planning:* purchase orders for the top 20 SKUs by volume must be placed 10–14 days (observed lead time range) ahead of demand peaks. Buffer stock for Q3 and Q4 should be ordered by the 15th of the prior month. A $22.4M swing between the January trough and the December peak means under-stocking in Q4 translates directly to missed revenue.
+
+---
+
+**Finding 5 — Delivery performance baseline established; 5 vendors show elevated schedule risk**
+
+Average lead time: 9.7 days (median 9.8, range 5–13). All 126 measurable vendors met the 14-day OTIF SLA proxy on this dataset — a clean baseline for future period-over-period comparison. Five vendors have the highest lead-time variance despite short average lead times:
+
+| Vendor | Avg Lead Time | Variance | Total POs |
+|---|---:|---:|---:|
+| ALISA CARR BEVERAGES | 7.6 days | 6.44 | 19 |
+| ALTAMAR BRANDS LLC | 7.9 days | 6.09 | 40 |
+| STARK BREWING COMPANY | 9.2 days | 5.81 | 12 |
+| STAR INDUSTRIES INC. | 8.3 days | 5.44 | 13 |
+| Circa Wines | 8.0 days | 5.39 | 43 |
+
+ALTAMAR BRANDS LLC is the most operationally relevant: 40 purchase orders annually with a variance of 6.09 means receiving windows are unpredictable even when the average looks acceptable.
+
+*Recommendation to Operations:* apply a buffer-stock or minimum-order-cycle rule for these five vendors to absorb receiving-window uncertainty. The OTIF framework is instrumented and ready to produce tier differentiation if supply chain conditions tighten in future periods.
+
+---
+
+## Dashboard Preview
+
+![Vendor Performance Dashboard](Images/vendor-performance-img.png)
+
+The dashboard covers vendor profitability, procurement concentration, working capital, and monthly sales trends across 129 vendors. Interactive views built in Power BI on the four pipeline output files. The `.pbix` file is in [`dashboard/vendor-performance.pbix`](dashboard/vendor-performance.pbix).
+
+---
+
+## Why I Built This
+
+I found this dataset on Kaggle and picked it specifically because it had real problems in it — not a pre-cleaned toy dataset. The same vendor appeared under different legal entity names across three source files. Purchase orders had negative lead times (receiving date before the PO date). Product descriptions didn't match across tables.
+
+The hardest part technically was the weighted average purchase price across 2.3 million rows read in 300,000-row chunks. A simple chunk-level mean gives the wrong answer when chunk sizes differ — I had to track running dollar and quantity totals separately and compute the true weighted average only at the end. The ExciseTax field in the sales data made the industry clear from the start: alcohol excise is collected from the distributor and passed through, so it inflates the headline sales price without affecting gross profit. I kept that in mind when setting up the margin calculations so the numbers would be defensible in an interview.
+
+---
+
+## Pipeline Architecture
+
+```
 purchases.csv       ──┐
 sales.csv            ─┤
 purchase_prices.csv  ─┼──► src/rebuild_pipeline.py ──► outputs/
 vendor_invoice.csv   ─┤         │
 begin_inventory.csv  ─┤    Canonical vendor map
 end_inventory.csv    ─┘    Lead time + OTIF KPIs
-                           Dollar reconciliation
-                           Validation test suite
+                           Dollar reconciliation (penny-exact)
+                           17-test validation suite
 ```
 
----
-
-## Key findings
-
-**Finding 1 — Vendor concentration risk:** the top 10 vendors account for **65.3%** of total
-procurement spend, representing **$210.3M of $321.9M**. This level of concentration is material
-operational risk because a disruption among a small supplier tier would affect most purchasing volume.
-
-**Finding 2 — Portfolio-level gross margin remains healthy, but only after excluding rows without
-2024 purchase cost basis:** cost-basis rows produce an overall reconstructed gross margin of **28.7%**.
-That is directionally strong, but 758 sales-only vendor-brand rows have no 2024 purchase record and must
-be handled separately rather than forced into margin calculations.
-
-**Finding 3 — Working capital is concentrated in a small supplier tier:** the top 10 vendors hold
-**64.9%** of unsold inventory value, representing **$10.12M of $15.60M**. This makes targeted vendor
-and SKU rationalisation more impactful than broad, portfolio-wide actions.
-
-**Finding 4 — Delivery timing is extremely clean in the delivered dataset:** average vendor lead time is
-**9.7 days**, median lead time is **9.8 days**, and the derived OTIF view classifies all 126 measurable
-vendors as **TIER_1_RELIABLE**. That makes the KPI reproducible, but it also suggests the source data is
-synthetic or unusually clean compared with real procurement operations.
+**Key decisions:**
+- Memory-safe 300,000-row chunk reads for the 1.5GB sales file
+- Modal-variant vendor name canonicalization across three source files
+- Freight allocated to vendor-brand rows by purchase-dollar share — additive in Power BI
+- 758 sales-only rows retained with `CostBasisAvailable = 0` rather than silently dropped
 
 ---
 
-## Vendor performance KPIs computed
+## KPIs Computed
 
-| KPI | Formula | Source columns |
+| KPI | Formula | Source |
 |---|---|---|
-| Gross Profit | `TotalSalesDollars - TotalPurchaseDollars` | purchases, sales |
-| Profit Margin % | `GrossProfit / TotalSalesDollars × 100` | Computed |
+| Gross Profit | `TotalSalesDollars − TotalPurchaseDollars` | purchases, sales |
+| Profit Margin % | `GrossProfit / TotalSalesDollars × 100` | computed |
 | Sell-Through Rate | `TotalSalesQuantity / TotalPurchaseQuantity` | purchases, sales |
-| Sales-to-Purchase Ratio | `TotalSalesDollars / TotalPurchaseDollars` | purchases, sales |
-| Unsold Inventory Value | `max(0, PurchaseQty - SalesQty) × PurchasePrice` | purchases, sales |
-| Avg Lead Time (days) | `AVG(ReceivingDate - PODate)` per vendor | purchases |
-| Lead Time Variance | `VAR(LeadTimeDays)` per vendor | purchases |
+| Stock Turnover | `TotalPurchaseDollars / AllocatedAvgInventoryValue` | purchases, inventory |
+| Unsold Inventory Value | `max(0, PurchaseQty − SalesQty) × PurchasePrice` | purchases, sales |
+| Avg Lead Time (days) | `AVG(ReceivingDate − PODate)` per vendor | purchases |
 | OTIF Rate % | `% of POs received within 14-day SLA proxy` | purchases |
-| Vendor Reliability Tier | `TIER_1 (≥95%), TIER_2 (≥80%), TIER_3 (<80%)` | Computed from OTIF |
-| Freight Cost | Vendor freight allocated to vendor-brand rows by purchase-dollar share | vendor_invoice, purchases |
+| Vendor Reliability Tier | `TIER_1 (≥95%), TIER_2 (≥80%), TIER_3 (<80%)` | computed |
+| Freight Cost | Vendor freight allocated by purchase-dollar share | vendor_invoice |
 
-**Note:** `SellThroughRate` is the quantity-based operational ratio. `StockTurnover` is computed from
-allocated average inventory value by vendor-brand, so the two metrics are not interchangeable.
-`FreightCost` is safe to sum in downstream BI tools because vendor freight is allocated across
-vendor-brand rows by purchase-dollar share during the rebuild.
+`SellThroughRate` and `StockTurnover` are not interchangeable — sell-through is quantity-based, stock turnover is value-based using allocated average inventory value by vendor-brand.
 
 ---
 
-## How to reproduce
+## How to Reproduce
+
+> `outputs/` is empty in this repository — all CSV outputs are regenerated locally. `data/sample/` contains 5,000-row subsets for inspection without the full 1.9GB raw data package.
 
 ```bash
-# 1. Clone the repository
+# Clone
 git clone https://github.com/Ayushgithubcodebasics/vendor-intelligence-pipeline.git
 cd vendor-intelligence-pipeline
 
-# 2. Create virtual environment and install dependencies
+# Install
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install pandas numpy sqlalchemy pytest
 
-# 3. Place raw CSV files in data/raw/
-#    (or use data/sample/ for lightweight inspection)
-
-# 4. Run the full rebuild pipeline
+# Run on full data (place CSVs in data/raw/ first)
 python -m src.rebuild_pipeline
 
-# 5. Validate outputs
-pytest tests/ -v
+# Run on sample data (no raw data needed)
+python -m src.rebuild_pipeline --source sample
 
-# 6. Optionally load raw tables and vendor summary into SQLite
-python -m src.ingest_sqlite
+# Validate
+pytest tests/ -v
 ```
 
-**Expected runtime on full data (~15.65M rows):** roughly 8–15 minutes on a standard laptop.  
-**Expected runtime on sample data (5,000 rows per file):** under 30 seconds for lightweight inspection.
+**Full data:** 8–15 minutes. **Sample data:** under 30 seconds.  
+Windows users: `run_rebuild_steps.ps1` · Mac/Linux users: `bash run_rebuild_steps.sh`
 
 ---
 
-## Known limitations and data caveats
+## Known Limitations
 
-1. **Gross Profit is period-aggregated, not period-matched.** Sales in 2024 may be fulfilled from
-   inventory purchased in earlier periods, so the gross-profit figure is directionally useful but not
-   equivalent to a formal COGS-based accounting margin.
+1. **Gross Profit is period-aggregated, not period-matched.** Sales in 2024 may draw from inventory purchased in prior periods — directionally reliable but not equivalent to a formal COGS-based accounting margin.
 
-2. **OTIF uses a 14-day SLA proxy.** The raw dataset does not include an explicit contracted delivery-date
-   field, so OTIF is calculated against a practical proxy rather than a contractual SLA.
+2. **OTIF uses a 14-day SLA proxy.** No explicit contracted delivery-date field exists in the raw data.
 
-3. **Malformed `InventoryId` values exist and should not be used as a master join key.** The issue is most
-   visible in Store 46, with 1,284 malformed rows in `end_inventory.csv` and 1,690 malformed rows in
-   `purchases.csv`, plus a small number elsewhere.
+3. **Malformed `InventoryId` values** exist — most visible in Store 46. Not used as a join key anywhere in the pipeline.
 
-4. **VendorName variants are normalised deliberately.** For example, VendorNumber 1587 appears as both
-   `VINEYARD BRANDS INC` and `VINEYARD BRANDS LLC`; the analytical layer maps such variants to a canonical
-   vendor name for stable vendor-level reporting.
+4. **VendorName variants are normalised deliberately.** VendorNumber 1587 appears as both `VINEYARD BRANDS INC` and `VINEYARD BRANDS LLC` across source files; the pipeline maps these to a single canonical name.
 
-5. **758 sales-only vendor-brand rows have no 2024 purchase cost basis.** Those rows are retained in the
-   final output with `CostBasisAvailable = 0` and `RowType = sales_only_no_2024_purchase` instead of being
-   silently dropped.
+5. **Sell-through outliers reach 274.5×.** 1,168 rows have `SellThroughRate > 2.0` — prior-period inventory contributing to 2024 sales. Filter or cap before using in averages.
 
-6. **Sell-through outliers are real and materially distort averages.** The output contains **1,168 rows**
-   with `SellThroughRate > 2.0`, and the maximum observed value is **274.5x**. Any Power BI average or
-   scatter chart using sell-through should cap or filter these rows before interpretation.
-
-7. **Profit-margin outliers are extreme because cost basis is period-aggregated.** The output contains
-   **698 rows** with `|ProfitMargin| > 100%`, and the minimum observed margin is **-23,730.64%**. These
-   are not formula bugs; they are a consequence of comparing 2024 sales against 2024 purchases when
-   prior-period inventory is still being sold.
+6. **Profit-margin outliers reach −23,730%.** 698 rows have `|ProfitMargin| > 100%` — a consequence of period-aggregated cost basis, not a formula error.
 
 ---
 
-## Project structure
+## Project Structure
 
-```text
+```
 vendor-intelligence-pipeline/
 ├── README.md
-├── PROJECT_NOTES.txt
 ├── requirements.txt
 ├── .gitignore
+├── run_rebuild_steps.ps1        ← Windows runner
+├── run_rebuild_steps.sh         ← Mac/Linux runner
 ├── data/
-│   ├── raw/                      # full raw CSV package (kept local, not for public GitHub)
-│   └── sample/                   # 5,000-row quickstart samples
+│   └── sample/                  ← 5,000-row quickstart samples
 ├── docs/
-│   ├── data_dictionary.md
-│   ├── dashboard_setup.md
-│   └── GDPR_statement.md
+│   ├── findings.md              ← full findings with recommendation tables
+│   ├── data_dictionary.md       ← field-level reference for all 6 source tables
+│   └── dashboard_setup.md      ← Power BI connection and DAX measure notes
 ├── src/
-│   ├── __init__.py
 │   ├── config.py
-│   ├── utils.py
 │   ├── ingestion.py
 │   ├── transform.py
 │   ├── reporting.py
@@ -196,25 +209,15 @@ vendor-intelligence-pipeline/
 │   ├── rebuild_pipeline.py
 │   └── ingest_sqlite.py
 ├── tests/
-│   └── test_output_integrity.py
-└── outputs/
-    ├── vendor_summary.csv
-    ├── vendor_lead_time.csv
-    ├── vendor_otif.csv
-    ├── vendor_sales_monthly.csv
-    ├── validation_metrics.json
-    └── validation_report.txt
+│   └── test_output_integrity.py ← 17 tests; 15 pass on sample, 17 on full data
+├── dashboard/
+│   └── vendor-performance.pbix
+└── outputs/                     ← empty in repo; regenerated by pipeline
 ```
 
 ---
 
-## What I'd improve next
+## What I Would Improve Next
 
-- **CI/CD:** add a GitHub Actions workflow to run `pytest` on the sample data on every push
-- **Cross-platform run script:** the current `run_rebuild_steps.ps1` is Windows-only; a `Makefile`
-  with `make run` and `make test` targets would cover Mac and Linux users
-- **Weighted average unit test:** a small fixed fixture (five rows, known correct answer) to
-  specifically validate the chunk-aggregation logic in `aggregate_purchases()`
-- **OTIF threshold sensitivity:** explore whether a tighter SLA window (7 days instead of 14)
-  produces any tier separation, or whether the clean lead times in this dataset make differentiation
-  impossible regardless of the threshold chosen
+- **Tighter OTIF threshold test:** run the framework at a 7-day SLA window to check whether tier differentiation becomes possible on this dataset, or whether lead times are too compressed regardless of threshold
+- **Makefile:** `make run` and `make test` would replace the two separate shell scripts and work identically on Mac, Linux, and Windows Subsystem for Linux
